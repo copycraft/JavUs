@@ -8,9 +8,7 @@ public class Main {
     private long window;
     private int width = 800, height = 600;
 
-    // 0 = menu, 1 = playing, 2 = keybinds (not used yet)
-    private int state = 0;
-
+    private int gameState = 0; // 0=menu, 1=playing
     private Menu menu;
     private Game game;
 
@@ -24,7 +22,6 @@ public class Main {
 
     private void init() {
         if (!glfwInit()) throw new IllegalStateException("GLFW init failed");
-
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         window = glfwCreateWindow(width, height, "JavUs", 0, 0);
         glfwMakeContextCurrent(window);
@@ -32,34 +29,23 @@ public class Main {
         glfwShowWindow(window);
         GL.createCapabilities();
 
-        // Create subsystems
-        menu = new Menu(window, width, height, () -> state = 1);
-        game = new Game(window, width, height);
-
-        // Resize callback: update sizes in subsystems
         glfwSetFramebufferSizeCallback(window, (win, w, h) -> {
-            if (w > 0 && h > 0) {
-                width = w;
-                height = h;
-                glViewport(0, 0, width, height);
-                menu.setSize(width, height);
-                game.setSize(width, height);
-            }
+            width = w; height = h;
+            glViewport(0, 0, width, height);
+            if (game != null) game.setSize(width, height);
+            if (menu != null) menu.setSize(width, height);
         });
 
-        // Forward key / mouse events where appropriate
+        menu = new Menu(window, width, height, () -> gameState = 1);
+        game = new Game(window, width, height);
+
         glfwSetKeyCallback(window, (win, key, scancode, action, mods) -> {
-            if (state == 0) menu.handleKey(key, action);
-            else if (state == 1) {
-                // Allow toggling menu with ESC
-                if (action == GLFW_PRESS && key == GLFW_KEY_ESCAPE) state = 0;
-                else game.handleKey(key, action);
-            }
+            if (gameState == 1) game.handleKey(key, action);
+            else menu.handleKey(key, action);
         });
 
         glfwSetMouseButtonCallback(window, (win, button, action, mods) -> {
-            if (state == 0) menu.handleMouse(button, action);
-            else if (state == 1) game.handleMouse(button, action);
+            if (gameState == 0) menu.handleMouse(button, action);
         });
     }
 
@@ -74,11 +60,12 @@ public class Main {
             glClear(GL_COLOR_BUFFER_BIT);
             glLoadIdentity();
 
-            if (state == 0) {
-                menu.drawMenu();
-            } else if (state == 1) {
-                game.update(dt);
-                game.drawGame();
+            switch (gameState) {
+                case 0 -> menu.drawMenu();
+                case 1 -> {
+                    game.update(dt);
+                    game.drawGame();
+                }
             }
 
             glfwSwapBuffers(window);

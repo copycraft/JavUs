@@ -9,13 +9,17 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.stb.STBTruetype.*;
 import static org.lwjgl.glfw.GLFW.*;
 
+/**
+ * Simple menu with a SinglePlayer button and text rendering via STB.
+ * Loads font from resources: /fonts/arial.ttf
+ */
 public class Menu {
     private long window;
     private int width, height;
     private final Runnable startAction;
 
     private STBTTBakedChar.Buffer cdata;
-    private int fontTex;
+    private int fontTex = -1;
 
     public Menu(long window, int width, int height, Runnable startAction) {
         this.window = window;
@@ -26,13 +30,15 @@ public class Menu {
         try {
             loadFontFromResource("/fonts/arial.ttf");
         } catch (IOException e) {
-            System.err.println("Failed to load font resource: " + e.getMessage());
+            System.err.println("Font load failed: " + e.getMessage());
             cdata = null;
             fontTex = -1;
         }
     }
 
     public void setSize(int w, int h) { this.width = w; this.height = h; }
+
+    public void doStart() { startAction.run(); }
 
     private void loadFontFromResource(String resourcePath) throws IOException {
         InputStream is = Menu.class.getResourceAsStream(resourcePath);
@@ -41,34 +47,31 @@ public class Menu {
         is.close();
 
         ByteBuffer ttf = BufferUtils.createByteBuffer(bytes.length);
-        ttf.put(bytes);
-        ttf.flip();
+        ttf.put(bytes).flip();
 
-        cdata = STBTTBakedChar.malloc(96); // ASCII 32..127
+        cdata = STBTTBakedChar.malloc(96);
         ByteBuffer bitmap = BufferUtils.createByteBuffer(512 * 512);
         stbtt_BakeFontBitmap(ttf, 32, bitmap, 512, 512, 32, cdata);
 
         fontTex = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, fontTex);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        // GL_ALPHA may be deprecated on some contexts but works for simple examples
         glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 512, 512, 0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     }
 
     public void handleKey(int key, int action) {
-        // Could be extended, e.g. Enter to start
-        if (action == GLFW_PRESS && key == GLFW_KEY_ENTER) startAction.run();
+        if (action == GLFW_PRESS && key == GLFW_KEY_ENTER) doStart();
     }
 
     public void handleMouse(int button, int action) {
-        if (button == 0 && action == GLFW_PRESS) {
+        if (button == GLFW_MOUSE_BUTTON_1 && action == GLFW_PRESS) {
             double[] mx = new double[1], my = new double[1];
             org.lwjgl.glfw.GLFW.glfwGetCursorPos(window, mx, my);
             float mouseX = (float) mx[0];
             float mouseY = height - (float) my[0]; // convert to bottom-left origin
 
-            float btnX = width / 2f - 100f, btnY = height / 2f - 20f, btnW = 200f, btnH = 40f;
+            float btnX = width / 2f - 120f, btnY = height / 2f - 30f, btnW = 240f, btnH = 50f;
             if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
                 startAction.run();
             }
@@ -76,16 +79,30 @@ public class Menu {
     }
 
     public void drawMenu() {
-        // Screen projection
+        // screen projection
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(0, width, 0, height, -1, 1);
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
-        // Draw background button quad
-        float btnX = width / 2f - 100f, btnY = height / 2f - 20f, btnW = 200f, btnH = 40f;
-        glColor3f(0.25f, 0.45f, 0.75f);
+        // nice title
+        if (cdata != null) {
+            glColor3f(1f, 1f, 1f);
+            drawText("JavUs", width / 2f - 60f, height - 80f, 2.0f);
+        } else {
+            glColor3f(1f,1f,1f);
+            glBegin(GL_QUADS);
+            glVertex2f(width/2f-30f, height-70f);
+            glVertex2f(width/2f+30f, height-70f);
+            glVertex2f(width/2f+30f, height-50f);
+            glVertex2f(width/2f-30f, height-50f);
+            glEnd();
+        }
+
+        // button background
+        float btnX = width / 2f - 120f, btnY = height / 2f - 30f, btnW = 240f, btnH = 50f;
+        glColor3f(0.2f, 0.45f, 0.8f);
         glBegin(GL_QUADS);
         glVertex2f(btnX, btnY);
         glVertex2f(btnX + btnW, btnY);
@@ -93,25 +110,17 @@ public class Menu {
         glVertex2f(btnX, btnY + btnH);
         glEnd();
 
-        // Draw text if font loaded
-        if (cdata != null && fontTex != -1) {
+        // button text
+        if (cdata != null) {
             glColor3f(1f, 1f, 1f);
-            // draw centered-ish
-            float tx = btnX + 20f;
-            float ty = btnY + 25f;
-            drawText("SinglePlayer", tx, ty, 1.0f);
+            drawText("SinglePlayer", btnX + 28f, btnY + 30f, 1.0f);
+            drawText("Options (Esc in-game)", 16f, 20f, 0.8f);
         } else {
-            // fallback: no font -> draw simple white label box
-            glColor3f(1f, 1f, 1f);
-            glBegin(GL_QUADS);
-            glVertex2f(btnX + 20f, btnY + 10f);
-            glVertex2f(btnX + 80f, btnY + 10f);
-            glVertex2f(btnX + 80f, btnY + 30f);
-            glVertex2f(btnX + 20f, btnY + 30f);
-            glEnd();
+            // fallback small white box already drawn
         }
     }
 
+    // drawText: uses baked chars; flips texture t-coords
     private void drawText(String text, float x, float y, float scale) {
         if (cdata == null || fontTex == -1) return;
 
@@ -127,7 +136,7 @@ public class Menu {
             STBTTBakedChar g = cdata.get(ch - 32);
 
             float x0 = px + g.xoff() * scale;
-            float y0 = y + g.yoff() * scale; // use + since STB yoff is baseline relative
+            float y0 = y + g.yoff() * scale;
             float x1 = x0 + (g.x1() - g.x0()) * scale;
             float y1 = y0 + (g.y1() - g.y0()) * scale;
 
@@ -135,7 +144,6 @@ public class Menu {
             float s1 = g.x1() / 512f, t1 = g.y1() / 512f;
 
             glBegin(GL_QUADS);
-            // flip texture t coordinates: 1 - t
             glTexCoord2f(s0, 1f - t0); glVertex2f(x0, y0);
             glTexCoord2f(s1, 1f - t0); glVertex2f(x1, y0);
             glTexCoord2f(s1, 1f - t1); glVertex2f(x1, y1);
