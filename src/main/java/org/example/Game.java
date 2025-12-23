@@ -1,241 +1,244 @@
 package org.example;
 
-import static org.lwjgl.glfw.GLFW.*;
+import java.util.*;
 import static org.lwjgl.opengl.GL11.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import static org.lwjgl.glfw.GLFW.*;
 
 public class Game {
-    private final long window;
-    private int width, height;
 
-    private final MapGen mapGen;
-    private float playerX, playerY;
-    private final float playerSize = MapGen.TILE_SIZE;
-    private final float speed = 120f;
-    private boolean showMini = false;
+    int width, height;
 
-    private float[] playerColor; // random color
-    private boolean isImpostor = true; // only this player is impostor
-    private float killCooldown = 0; // seconds remaining
+    // Map
+    MapGen map;
 
-    // Buttons
-    private final float btnWidth = 100, btnHeight = 50;
-    private float killBtnX, killBtnY, shapeshiftBtnX, shapeshiftBtnY;
+    // Player
+    float playerX, playerY;
+    float playerSize = 18;
+    float speed = 180;
+    float[] playerColor = randomColor();
 
-    // Bots
-    private final List<Bot> bots = new ArrayList<>();
-    private final int BOT_COUNT = 5;
+    // Game state
+    boolean meeting = false;
+    float meetingTimer = 8f;
+    float killCooldown = 0;
 
-    private static class Bot {
-        float x, y;
-        float[] color;
-        float moveTimer = 0;
-        float dx = 0, dy = 0;
-        Bot(float x, float y, float[] color) { this.x=x; this.y=y; this.color=color; }
-    }
+    // Bots and dead bodies
+    List<Bot> bots = new ArrayList<>();
+    List<DeadBody> bodies = new ArrayList<>();
 
-    public Game(long window, int width, int height) {
-        this.window = window;
-        this.width = width;
-        this.height = height;
-        this.mapGen = new MapGen(12345L);
-
-        MapGen.Room r = mapGen.getRooms().get(0);
-        playerX = (r.x + r.w / 2f) * MapGen.TILE_SIZE;
-        playerY = (r.y + r.h / 2f) * MapGen.TILE_SIZE;
-
-        Random rng = new Random();
-        playerColor = new float[]{ rng.nextFloat(), rng.nextFloat(), rng.nextFloat() };
-        updateButtonPositions();
-
-        // Spawn bots in random rooms
-        for (int i=0;i<BOT_COUNT;i++){
-            MapGen.Room room = mapGen.getRooms().get(rng.nextInt(mapGen.getRooms().size()));
-            float bx = (room.x + rng.nextInt(room.w)) * MapGen.TILE_SIZE;
-            float by = (room.y + rng.nextInt(room.h)) * MapGen.TILE_SIZE;
-            float[] c = new float[]{ rng.nextFloat(), rng.nextFloat(), rng.nextFloat() };
-            bots.add(new Bot(bx, by, c));
-        }
-    }
-
-    public void setSize(int w, int h) {
-        this.width = w; this.height = h;
-        updateButtonPositions();
-    }
-
-    private void updateButtonPositions() {
-        killBtnX = width - btnWidth - 20;
-        killBtnY = 20;
-        shapeshiftBtnX = width - 2*btnWidth - 40;
-        shapeshiftBtnY = 20;
-    }
+    // Voting screen
+    VotingScreen votingScreen;
 
     public void handleKey(int key, int action) {
-        if (action == GLFW_PRESS) {
-            if (key == GLFW_KEY_M) showMini = !showMini;
+        // Movement handled in update()
+    }
+
+    // Buttons
+    class Button {
+        float x, y, w, h;
+        float[] color;
+        String label;
+
+        Button(float x, float y, float w, float h, float[] color, String label) {
+            this.x = x;
+            this.y = y;
+            this.w = w;
+            this.h = h;
+            this.color = color;
+            this.label = label;
+        }
+
+        boolean isHovered(float mx, float my) {
+            return mx >= x && mx <= x + w && my >= y && my <= y + h;
+        }
+
+        void draw() {
+            glColor3f(color[0], color[1], color[2]);
+            quad(x, y, w, h);
+            glColor3f(0,0,0);
+            drawBorder(x, y, w, h);
         }
     }
 
-    public void handleMouse(int button, int action, double mx, double my) {
-        if (button == 0 && action == GLFW_PRESS) {
-            float mouseX = (float) mx;
-            float mouseY = height - (float) my;
+    Button killButton;
+    Button reportButton;
 
-            if (isImpostor && killCooldown <= 0 &&
-                    mouseX >= killBtnX && mouseX <= killBtnX + btnWidth &&
-                    mouseY >= killBtnY && mouseY <= killBtnY + btnHeight) {
-                killAction();
-                killCooldown = 10f;
-            }
+    public Game(int w, int h) {
+        width = w;
+        height = h;
 
-            if (isImpostor &&
-                    mouseX >= shapeshiftBtnX && mouseX <= shapeshiftBtnX + btnWidth &&
-                    mouseY >= shapeshiftBtnY && mouseY <= shapeshiftBtnY + btnHeight) {
-                shapeshift();
-            }
-        }
-    }
+        map = new MapGen(System.currentTimeMillis());
 
-    private void killAction() { System.out.println("Killed a player!"); }
+        // Setup buttons
+        killButton = new Button(width - 140, 20, 120, 60, new float[]{1f, 0f, 0f}, "Kill");
+        reportButton = new Button(width - 140, 100, 120, 60, new float[]{1f, 1f, 0f}, "Report");
 
-    private void shapeshift() {
         Random rng = new Random();
-        playerColor = new float[]{ rng.nextFloat(), rng.nextFloat(), rng.nextFloat() };
-        System.out.println("Shapeshifted!");
+        // Add some bots in random rooms
+        for (int i = 0; i < 5; i++) {
+            MapGen.Room r = map.getRooms().get(rng.nextInt(map.getRooms().size()));
+            float bx = r.x * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
+            float by = r.y * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
+            bots.add(new Bot(bx, by));
+        }
+
+        // Player starts in center of first room
+        MapGen.Room first = map.getRooms().get(0);
+        playerX = first.x * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
+        playerY = first.y * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
     }
 
-    public void update(float dt) {
-        killCooldown -= dt;
-        if (killCooldown < 0) killCooldown = 0;
+    void setSize(int w, int h) {
+        width = w;
+        height = h;
+        // Update buttons on resize
+        killButton.x = width - killButton.w - 20;
+        reportButton.x = width - reportButton.w - 20;
+        reportButton.y = killButton.y + killButton.h + 20;
+    }
 
-        // Player movement
-        float dx=0, dy=0;
-        if (glfwGetKey(window, GLFW_KEY_W)==GLFW_PRESS) dy+=speed*dt;
-        if (glfwGetKey(window, GLFW_KEY_S)==GLFW_PRESS) dy-=speed*dt;
-        if (glfwGetKey(window, GLFW_KEY_A)==GLFW_PRESS) dx-=speed*dt;
-        if (glfwGetKey(window, GLFW_KEY_D)==GLFW_PRESS) dx+=speed*dt;
-        tryMove(dx, dy);
+    void handleMouse(float mx, float my, int button, int action) {
+        if (action != GLFW_PRESS) return;
+        my = height - my; // invert Y for OpenGL
+
+        if (votingScreen != null) {
+            votingScreen.handleMouse(mx, my, button, action);
+            if (votingScreen.voteFinished) {
+                votingScreen = null;
+                meeting = false;
+            }
+            return;
+        }
+
+        if (killButton.isHovered(mx, my)) {
+            System.out.println("[BUTTON] Kill clicked!");
+            tryKill();
+        }
+        if (reportButton.isHovered(mx, my)) {
+            System.out.println("[BUTTON] Report clicked!");
+            tryReport();
+        }
+    }
+
+    void update(float dt) {
+        if (meeting && votingScreen == null) {
+            meetingTimer -= dt;
+            if (meetingTimer <= 0) meeting = false;
+            return;
+        }
+
+        if (killCooldown > 0) killCooldown -= dt;
+
+        // --- Sliding player movement ---
+        float nx = playerX, ny = playerY;
+        if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_W) == GLFW_PRESS) ny += speed * dt;
+        if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_S) == GLFW_PRESS) ny -= speed * dt;
+        if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_A) == GLFW_PRESS) nx -= speed * dt;
+        if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_D) == GLFW_PRESS) nx += speed * dt;
+
+        if (!map.collides(nx, playerY)) playerX = nx;
+        if (!map.collides(playerX, ny)) playerY = ny;
 
         // Update bots
-        for (Bot b : bots) updateBot(b, dt);
-    }
-
-    private void tryMove(float dx, float dy) {
-        if (!mapGen.collides(playerX+dx, playerY)) playerX+=dx;
-        if (!mapGen.collides(playerX, playerY+dy)) playerY+=dy;
-    }
-
-    private void updateBot(Bot b, float dt) {
-        b.moveTimer -= dt;
-        if (b.moveTimer <= 0) {
-            Random rng = new Random();
-            b.dx = (rng.nextFloat()*2-1) * speed/2f;
-            b.dy = (rng.nextFloat()*2-1) * speed/2f;
-            b.moveTimer = 1f + rng.nextFloat()*2f; // move in direction 1-3s
-        }
-
-        float nx = b.x + b.dx*dt;
-        float ny = b.y + b.dy*dt;
-        if (!mapGen.collides(nx, b.y)) b.x=nx;
-        if (!mapGen.collides(b.x, ny)) b.y=ny;
-    }
-
-    private void applyCamera() {
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, width, 0, height, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-
-        glScalef(MapGen.CAMERA_ZOOM, MapGen.CAMERA_ZOOM, 1f);
-        float visibleW = width / MapGen.CAMERA_ZOOM;
-        float visibleH = height / MapGen.CAMERA_ZOOM;
-        float camX = playerX + playerSize/2f - visibleW/2f;
-        float camY = playerY + playerSize/2f - visibleH/2f;
-        camX = Math.max(0, Math.min(camX, MapGen.MAP_WIDTH*MapGen.TILE_SIZE - visibleW));
-        camY = Math.max(0, Math.min(camY, MapGen.MAP_HEIGHT*MapGen.TILE_SIZE - visibleH));
-        glTranslatef(-camX, -camY, 0);
-    }
-
-    public void drawGame() {
-        applyCamera();
-        mapGen.drawMap();
-
-        // Draw player
-        glColor3f(playerColor[0], playerColor[1], playerColor[2]);
-        glBegin(GL_QUADS);
-        glVertex2f(playerX, playerY);
-        glVertex2f(playerX+playerSize, playerY);
-        glVertex2f(playerX+playerSize, playerY+playerSize);
-        glVertex2f(playerX, playerY+playerSize);
-        glEnd();
-
-        // Draw bots
         for (Bot b : bots) {
-            glColor3f(b.color[0], b.color[1], b.color[2]);
-            glBegin(GL_QUADS);
-            glVertex2f(b.x, b.y);
-            glVertex2f(b.x+playerSize, b.y);
-            glVertex2f(b.x+playerSize, b.y+playerSize);
-            glVertex2f(b.x, b.y+playerSize);
-            glEnd();
+            b.update(dt);
+            for (DeadBody d : bodies) {
+                if (!d.reported && dist(b.x, b.y, d.x, d.y) < 20) {
+                    d.reported = true;
+                    meeting = true;
+                    meetingTimer = 8;
+                    votingScreen = new VotingScreen(this, width, height);
+                }
+            }
         }
-
-        // Mini-map
-        if (showMini) {
-            glPushMatrix();
-            glMatrixMode(GL_PROJECTION);
-            glPushMatrix();
-            glLoadIdentity();
-            glOrtho(0,width,0,height,-1,1);
-            glMatrixMode(GL_MODELVIEW);
-            glLoadIdentity();
-            mapGen.drawMiniMap(playerX,playerY,height);
-            glPopMatrix();
-            glMatrixMode(GL_PROJECTION);
-            glPopMatrix();
-            glMatrixMode(GL_MODELVIEW);
-        }
-
-        drawButtons();
     }
 
-    private void drawButtons() {
-        glPushMatrix();
-        glLoadIdentity();
+    void tryKill() {
+        if (killCooldown > 0) return;
 
-        // Kill button
-        glColor3f(0.5f,0.1f,0.1f);
-        glBegin(GL_QUADS);
-        glVertex2f(killBtnX, killBtnY);
-        glVertex2f(killBtnX+btnWidth, killBtnY);
-        glVertex2f(killBtnX+btnWidth, killBtnY+btnHeight);
-        glVertex2f(killBtnX, killBtnY+btnHeight);
-        glEnd();
-
-        // Kill cooldown overlay
-        if(killCooldown>0){
-            float pct = 1f - killCooldown/10f;
-            glColor3f(0.8f,0f,0f);
-            glBegin(GL_QUADS);
-            glVertex2f(killBtnX, killBtnY);
-            glVertex2f(killBtnX + btnWidth*pct, killBtnY);
-            glVertex2f(killBtnX + btnWidth*pct, killBtnY+btnHeight);
-            glVertex2f(killBtnX, killBtnY+btnHeight);
-            glEnd();
+        Bot closest = null;
+        float minDist = Float.MAX_VALUE;
+        for (Bot b : bots) {
+            if (!b.alive) continue;
+            float d = dist(playerX, playerY, b.x, b.y);
+            if (d < 25 && d < minDist) {
+                minDist = d;
+                closest = b;
+            }
         }
 
-        // Shapeshift button
-        glColor3f(0.1f,0.1f,0.5f);
-        glBegin(GL_QUADS);
-        glVertex2f(shapeshiftBtnX, shapeshiftBtnY);
-        glVertex2f(shapeshiftBtnX+btnWidth, shapeshiftBtnY);
-        glVertex2f(shapeshiftBtnX+btnWidth, shapeshiftBtnY+btnHeight);
-        glVertex2f(shapeshiftBtnX, shapeshiftBtnY+btnHeight);
-        glEnd();
+        if (closest != null) {
+            closest.alive = false;
+            bodies.add(new DeadBody(closest.x, closest.y, closest.color));
+            killCooldown = 10;
+        }
+    }
+
+    void tryReport() {
+        for (DeadBody d : bodies) {
+            if (!d.reported && dist(playerX, playerY, d.x, d.y) < 25) {
+                d.reported = true;
+                meeting = true;
+                meetingTimer = 8;
+                votingScreen = new VotingScreen(this, width, height);
+                break;
+            }
+        }
+    }
+
+    void render() {
+        if (votingScreen != null) {
+            votingScreen.draw();
+            return; // pause map/player rendering
+        }
+
+        float zoom = 2.5f;
+
+        glPushMatrix();
+        glScalef(zoom, zoom, 1f);
+        glTranslatef(-playerX + width / (2f * zoom), -playerY + height / (2f * zoom), 0f);
+
+        map.drawMap();
+        for (DeadBody d : bodies) d.draw();
+        for (Bot b : bots) b.draw();
+        drawPlayer();
 
         glPopMatrix();
+
+        // Draw HUD buttons
+        killButton.draw();
+        reportButton.draw();
+    }
+
+    void drawPlayer() {
+        glColor3f(playerColor[0], playerColor[1], playerColor[2]);
+        quad(playerX, playerY, playerSize, playerSize);
+    }
+
+    // Utilities
+    static void quad(float x, float y, float w, float h) {
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + w, y);
+        glVertex2f(x + w, y + h);
+        glVertex2f(x, y + h);
+        glEnd();
+    }
+
+    static void drawBorder(float x, float y, float w, float h) {
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(x, y);
+        glVertex2f(x + w, y);
+        glVertex2f(x + w, y + h);
+        glVertex2f(x, y + h);
+        glEnd();
+    }
+
+    static float dist(float x1, float y1, float x2, float y2) {
+        return (float) Math.hypot(x2 - x1, y2 - y1);
+    }
+
+    static float[] randomColor() {
+        return new float[]{(float) Math.random(), (float) Math.random(), (float) Math.random()};
     }
 }
