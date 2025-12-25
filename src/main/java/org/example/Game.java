@@ -129,7 +129,7 @@ public class Game {
 
         if (killCooldown > 0) killCooldown -= dt;
 
-        // --- Sliding player movement ---
+        // --- Player movement ---
         float nx = playerX, ny = playerY;
         if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_W) == GLFW_PRESS) ny += speed * dt;
         if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_S) == GLFW_PRESS) ny -= speed * dt;
@@ -142,16 +142,9 @@ public class Game {
         // Update bots
         for (Bot b : bots) {
             b.update(dt);
-            for (DeadBody d : bodies) {
-                if (!d.reported && dist(b.x, b.y, d.x, d.y) < 20) {
-                    d.reported = true;
-                    meeting = true;
-                    meetingTimer = 8;
-                    votingScreen = new VotingScreen(this, width, height);
-                }
-            }
         }
     }
+
 
     void tryKill() {
         if (killCooldown > 0) return;

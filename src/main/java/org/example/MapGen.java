@@ -69,14 +69,40 @@ public class MapGen {
         int bx = b.x + b.w / 2;
         int by = b.y + b.h / 2;
 
+        int thickness = 3; // 👈 hallway thickness (odd number looks best)
+
         if (rng.nextBoolean()) {
-            for (int x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) floor[x][ay] = true;
-            for (int y = Math.min(ay, by); y <= Math.max(ay, by); y++) floor[bx][y] = true;
+            // Horizontal first
+            for (int x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) {
+                for (int t = -thickness / 2; t <= thickness / 2; t++) {
+                    carve(x, ay + t);
+                }
+            }
+            for (int y = Math.min(ay, by); y <= Math.max(ay, by); y++) {
+                for (int t = -thickness / 2; t <= thickness / 2; t++) {
+                    carve(bx + t, y);
+                }
+            }
         } else {
-            for (int y = Math.min(ay, by); y <= Math.max(ay, by); y++) floor[ax][y] = true;
-            for (int x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) floor[x][by] = true;
+            // Vertical first
+            for (int y = Math.min(ay, by); y <= Math.max(ay, by); y++) {
+                for (int t = -thickness / 2; t <= thickness / 2; t++) {
+                    carve(ax + t, y);
+                }
+            }
+            for (int x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) {
+                for (int t = -thickness / 2; t <= thickness / 2; t++) {
+                    carve(x, by + t);
+                }
+            }
         }
     }
+
+    private void carve(int x, int y) {
+        if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return;
+        floor[x][y] = true;
+    }
+
 
     public boolean collides(float x, float y) {
         int tx = (int)((x + TILE_SIZE / 2f) / TILE_SIZE);
