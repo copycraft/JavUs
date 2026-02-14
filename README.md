@@ -23,8 +23,6 @@ The game is **semi-playable**, has **no in-game text explanations**, and is curr
 
 ## Project Status
 
-⚠️ **Unfinished / Abandoned Prototype**
-
 - Core mechanics exist
 - No win/lose conditions
 - No sound
@@ -43,16 +41,12 @@ Still useful as:
 ## Requirements
 
 - **Java 21**
-- LWJGL properly set up (OpenGL, GLFW, STB)
-- Desktop GPU with OpenGL support
 
 ---
 
 ## How to Run
 
-1. Make sure Java 21 is installed
-2. Open the project in your IDE
-3. Run the main class: `org.example.Main`
+1. Run the jar
 
 A window titled **JavUs** will open.
 
@@ -86,31 +80,6 @@ A window titled **JavUs** will open.
 
 ---
 
-## Controls Summary
-
-| Action | Control |
-|------|--------|
-| Move | W / A / S / D |
-| Kill | Click red button |
-| Report | Click yellow button |
-| Vote | Click a player on voting screen |
-| Start Game | Click blue button / Enter |
-
----
-
-## Code Structure (Overview)
-
-- `Main` — window setup, game loop, state switching
-- `Menu` — main menu rendering & input
-- `Game` — core gameplay logic
-- `MapGen` — procedural map generation
-- `Bot` — simple AI entities
-- `DeadBody` — dead body representation
-- `VotingScreen` — voting UI and logic
-
----
-
 ## License
 
-No license specified.  
-Use, modify, or learn from it freely.
+GLWTS
