@@ -3,6 +3,7 @@ package org.example;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.opengl.GL;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Main {
     private long window;
@@ -19,6 +20,7 @@ public class Main {
     public void run() {
         init();
         loop();
+        if (window != NULL) glfwDestroyWindow(window);
         glfwTerminate();
     }
 
@@ -26,22 +28,34 @@ public class Main {
         if (!glfwInit()) throw new IllegalStateException("GLFW init failed");
 
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        window = glfwCreateWindow(width, height, "JavUs", 0, 0);
+        window = glfwCreateWindow(width, height, "JavUs", NULL, NULL);
+        if (window == NULL) throw new RuntimeException("Failed to create GLFW window");
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1);
         glfwShowWindow(window);
         GL.createCapabilities();
 
+        glViewport(0, 0, width, height);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, width, 0, height, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
         glfwSetFramebufferSizeCallback(window, (win, w, h) -> {
             width = w;
             height = h;
             glViewport(0, 0, width, height);
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glOrtho(0, width, 0, height, -1, 1);
+            glMatrixMode(GL_MODELVIEW);
             if (game != null) game.setSize(width, height);
             if (menu != null) menu.setSize(width, height);
         });
 
         menu = new Menu(window, width, height, () -> gameState = 1);
-        game = new Game(width, height); // ✅ FIXED
+        game = new Game(width, height);
 
         glfwSetKeyCallback(window, (win, key, scancode, action, mods) -> {
             if (gameState == 1) game.handleKey(key, action);
@@ -49,7 +63,6 @@ public class Main {
         });
 
         glfwSetMouseButtonCallback(window, (win, button, action, mods) -> {
-            // Get mouse position
             double[] mx = new double[1];
             double[] my = new double[1];
             glfwGetCursorPos(window, mx, my);

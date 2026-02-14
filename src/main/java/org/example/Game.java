@@ -5,35 +5,23 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.glfw.GLFW.*;
 
 public class Game {
-
     int width, height;
-
-    // Map
     MapGen map;
-
-    // Player
     float playerX, playerY;
     float playerSize = 18;
     float speed = 180;
     float[] playerColor = randomColor();
-
-    // Game state
     boolean meeting = false;
     float meetingTimer = 8f;
     float killCooldown = 0;
-
-    // Bots and dead bodies
     List<Bot> bots = new ArrayList<>();
     List<DeadBody> bodies = new ArrayList<>();
-
-    // Voting screen
     VotingScreen votingScreen;
 
     public void handleKey(int key, int action) {
         // Movement handled in update()
     }
 
-    // Buttons
     class Button {
         float x, y, w, h;
         float[] color;
@@ -55,7 +43,7 @@ public class Game {
         void draw() {
             glColor3f(color[0], color[1], color[2]);
             quad(x, y, w, h);
-            glColor3f(0,0,0);
+            glColor3f(0, 0, 0);
             drawBorder(x, y, w, h);
         }
     }
@@ -69,40 +57,42 @@ public class Game {
 
         map = new MapGen(System.currentTimeMillis());
 
-        // Setup buttons
-        killButton = new Button(width - 140, 20, 120, 60, new float[]{1f, 0f, 0f}, "Kill");
-        reportButton = new Button(width - 140, 100, 120, 60, new float[]{1f, 1f, 0f}, "Report");
+        float margin = 20;
+        killButton = new Button(width - 140 - margin, margin, 120, 60, new float[]{1f, 0f, 0f}, "Kill");
+        reportButton = new Button(width - 140 - margin, margin + 80, 120, 60, new float[]{1f, 1f, 0f}, "Report");
 
         Random rng = new Random();
-        // Add some bots in random rooms
-        for (int i = 0; i < 5; i++) {
-            MapGen.Room r = map.getRooms().get(rng.nextInt(map.getRooms().size()));
-            float bx = r.x * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
-            float by = r.y * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
-            bots.add(new Bot(bx, by));
-        }
+        List<MapGen.Room> rooms = map.getRooms();
+        if (!rooms.isEmpty()) {
+            for (int i = 0; i < 5; i++) {
+                MapGen.Room r = rooms.get(rng.nextInt(rooms.size()));
+                float bx = r.x * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
+                float by = r.y * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
+                bots.add(new Bot(bx, by));
+            }
 
-        // Player starts in center of first room
-        MapGen.Room first = map.getRooms().get(0);
-        playerX = first.x * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
-        playerY = first.y * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
+            MapGen.Room first = rooms.get(0);
+            playerX = first.x * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
+            playerY = first.y * MapGen.TILE_SIZE + MapGen.TILE_SIZE / 2f;
+        }
     }
 
     void setSize(int w, int h) {
         width = w;
         height = h;
-        // Update buttons on resize
-        killButton.x = width - killButton.w - 20;
-        reportButton.x = width - reportButton.w - 20;
+        float margin = 20;
+        killButton.x = width - killButton.w - margin;
+        reportButton.x = width - reportButton.w - margin;
         reportButton.y = killButton.y + killButton.h + 20;
     }
 
     void handleMouse(float mx, float my, int button, int action) {
         if (action != GLFW_PRESS) return;
-        my = height - my; // invert Y for OpenGL
+
+        float invY = height - my;
 
         if (votingScreen != null) {
-            votingScreen.handleMouse(mx, my, button, action);
+            votingScreen.handleMouse(mx, invY, button, action);
             if (votingScreen.voteFinished) {
                 votingScreen = null;
                 meeting = false;
@@ -110,13 +100,15 @@ public class Game {
             return;
         }
 
-        if (killButton.isHovered(mx, my)) {
+        if (killButton.isHovered(mx, invY)) {
             System.out.println("[BUTTON] Kill clicked!");
             tryKill();
+            return;
         }
-        if (reportButton.isHovered(mx, my)) {
+        if (reportButton.isHovered(mx, invY)) {
             System.out.println("[BUTTON] Report clicked!");
             tryReport();
+            return;
         }
     }
 
@@ -129,12 +121,14 @@ public class Game {
 
         if (killCooldown > 0) killCooldown -= dt;
 
-        // --- Player movement ---
         float nx = playerX, ny = playerY;
-        if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_W) == GLFW_PRESS) ny += speed * dt;
-        if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_S) == GLFW_PRESS) ny -= speed * dt;
-        if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_A) == GLFW_PRESS) nx -= speed * dt;
-        if (glfwGetKey(glfwGetCurrentContext(), GLFW_KEY_D) == GLFW_PRESS) nx += speed * dt;
+        long ctx = glfwGetCurrentContext();
+        if (ctx != 0) {
+            if (glfwGetKey(ctx, GLFW_KEY_W) == GLFW_PRESS) ny += speed * dt;
+            if (glfwGetKey(ctx, GLFW_KEY_S) == GLFW_PRESS) ny -= speed * dt;
+            if (glfwGetKey(ctx, GLFW_KEY_A) == GLFW_PRESS) nx -= speed * dt;
+            if (glfwGetKey(ctx, GLFW_KEY_D) == GLFW_PRESS) nx += speed * dt;
+        }
 
         if (!map.collides(nx, playerY)) playerX = nx;
         if (!map.collides(playerX, ny)) playerY = ny;
@@ -144,7 +138,6 @@ public class Game {
             b.update(dt);
         }
     }
-
 
     void tryKill() {
         if (killCooldown > 0) return;
@@ -182,7 +175,7 @@ public class Game {
     void render() {
         if (votingScreen != null) {
             votingScreen.draw();
-            return; // pause map/player rendering
+            return;
         }
 
         float zoom = 2.5f;
@@ -198,7 +191,6 @@ public class Game {
 
         glPopMatrix();
 
-        // Draw HUD buttons
         killButton.draw();
         reportButton.draw();
     }
@@ -208,7 +200,6 @@ public class Game {
         quad(playerX, playerY, playerSize, playerSize);
     }
 
-    // Utilities
     static void quad(float x, float y, float w, float h) {
         glBegin(GL_QUADS);
         glVertex2f(x, y);

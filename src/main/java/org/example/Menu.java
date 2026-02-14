@@ -38,8 +38,6 @@ public class Menu {
         this.height = h;
     }
 
-    /* ================= FONT ================= */
-
     private void loadFont(String path) throws IOException {
         InputStream is = Menu.class.getResourceAsStream(path);
         if (is == null) throw new IOException("Missing font: " + path);
@@ -58,12 +56,9 @@ public class Menu {
         fontTex = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, fontTex);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 512, 512, 0,
-                GL_ALPHA, GL_UNSIGNED_BYTE, bitmap);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 512, 512, 0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     }
-
-    /* ================= INPUT ================= */
 
     public void handleKey(int key, int action) {
         if (key == GLFW_KEY_ENTER && action == GLFW_PRESS) {
@@ -91,8 +86,6 @@ public class Menu {
             startAction.run();
         }
     }
-
-    /* ================= DRAW ================= */
 
     public void drawMenu() {
         glMatrixMode(GL_PROJECTION);
@@ -125,8 +118,6 @@ public class Menu {
         glColor3f(1f, 1f, 1f);
         drawText("SinglePlayer", bx + 50, by + 50, 1.4f);
     }
-
-    /* ================= TEXT ================= */
 
     private void drawText(String text, float x, float y, float scale) {
         if (cdata == null || fontTex == -1) return;

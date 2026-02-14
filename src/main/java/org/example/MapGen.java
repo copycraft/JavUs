@@ -32,14 +32,12 @@ public class MapGen {
     public List<Room> getRooms() { return rooms; }
 
     private void generate() {
-        // Clear map
         for (int x = 0; x < MAP_WIDTH; x++)
             for (int y = 0; y < MAP_HEIGHT; y++) {
                 floor[x][y] = false;
                 roomId[x][y] = -1;
             }
 
-        // Generate rooms
         for (int i = 0; i < MAX_ROOMS; i++) {
             int w = 6 + rng.nextInt(10);
             int h = 6 + rng.nextInt(10);
@@ -69,31 +67,22 @@ public class MapGen {
         int bx = b.x + b.w / 2;
         int by = b.y + b.h / 2;
 
-        int thickness = 3; // 👈 hallway thickness (odd number looks best)
+        int thickness = 3;
+        int half = thickness / 2;
 
         if (rng.nextBoolean()) {
-            // Horizontal first
             for (int x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) {
-                for (int t = -thickness / 2; t <= thickness / 2; t++) {
-                    carve(x, ay + t);
-                }
+                for (int t = -half; t <= half; t++) carve(x, ay + t);
             }
             for (int y = Math.min(ay, by); y <= Math.max(ay, by); y++) {
-                for (int t = -thickness / 2; t <= thickness / 2; t++) {
-                    carve(bx + t, y);
-                }
+                for (int t = -half; t <= half; t++) carve(bx + t, y);
             }
         } else {
-            // Vertical first
             for (int y = Math.min(ay, by); y <= Math.max(ay, by); y++) {
-                for (int t = -thickness / 2; t <= thickness / 2; t++) {
-                    carve(ax + t, y);
-                }
+                for (int t = -half; t <= half; t++) carve(ax + t, y);
             }
             for (int x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) {
-                for (int t = -thickness / 2; t <= thickness / 2; t++) {
-                    carve(x, by + t);
-                }
+                for (int t = -half; t <= half; t++) carve(x, by + t);
             }
         }
     }
@@ -102,7 +91,6 @@ public class MapGen {
         if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return;
         floor[x][y] = true;
     }
-
 
     public boolean collides(float x, float y) {
         int tx = (int)((x + TILE_SIZE / 2f) / TILE_SIZE);
@@ -134,7 +122,6 @@ public class MapGen {
     public void drawMiniMap(float playerX, float playerY, int windowHeight) {
         float scale = 3f, px = 10f, py = windowHeight - MAP_HEIGHT * scale - 10f;
 
-        // Draw map
         for (int x = 0; x < MAP_WIDTH; x++)
             for (int y = 0; y < MAP_HEIGHT; y++) {
                 if (floor[x][y]) {
@@ -149,7 +136,6 @@ public class MapGen {
                 }
             }
 
-        // Draw player
         glColor3f(1f, 0.2f, 0.2f);
         glBegin(GL_QUADS);
         glVertex2f(px + playerX / TILE_SIZE * scale, py + playerY / TILE_SIZE * scale);

@@ -14,7 +14,6 @@ public class Bot {
 
     public void update(float dt) {
         if (!alive) return;
-        // simple random movement
         x += (Math.random() - 0.5f) * 60 * dt;
         y += (Math.random() - 0.5f) * 60 * dt;
     }
@@ -22,6 +21,6 @@ public class Bot {
     public void draw() {
         if (!alive) return;
         glColor3f(color[0], color[1], color[2]);
-        Game.quad(x, y, 18,18);
+        Game.quad(x, y, 18, 18);
     }
 }

@@ -28,9 +28,6 @@ public class VotingScreen {
             Game.quad(x, y, w, h);
             glColor3f(0,0,0);
             Game.drawBorder(x, y, w, h);
-
-            // draw name (placeholder)
-            // You can add a proper text rendering later
         }
     }
 
@@ -38,13 +35,13 @@ public class VotingScreen {
     boolean voteFinished = false;
 
     public VotingScreen(Game game, int width, int height) {
-        // Add player
-        candidates.add(new Votable("You", true, width/2f - 100, 100));
-
-        // Add bots
+        candidates.add(new Votable("You", true, width/2f - 100, 100f));
+        float startY = 160f;
+        float gap = 60f;
         int i = 0;
         for (Bot b : game.bots) {
-            candidates.add(new Votable("Bot" + i++, false, width/2f - 100, 160 + i*60));
+            candidates.add(new Votable("Bot" + i, false, width/2f - 100, startY + i * gap));
+            i++;
         }
     }
 
@@ -62,7 +59,6 @@ public class VotingScreen {
     }
 
     public void draw() {
-        // Draw semi-transparent background
         glColor4f(0, 0, 0, 0.75f);
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
@@ -70,8 +66,6 @@ public class VotingScreen {
         glVertex2f(1920, 1080);
         glVertex2f(0, 1080);
         glEnd();
-
-        // Draw candidates
         for (Votable v : candidates) v.draw();
     }
 }
